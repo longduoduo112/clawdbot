@@ -30,6 +30,7 @@ Related:
   falls back to `agents.defaults.imageModel`, then the resolved session/default
   model.
 - `agents.defaults.imageGenerationModel` is used by the shared image-generation capability. If omitted, `image_generate` can still infer an auth-backed provider default. It tries the current default provider first, then the remaining registered image-generation providers in provider-id order. If you set a specific provider/model, also configure that provider's auth/API key.
+- `agents.defaults.videoGenerationModel` is used by the shared video-generation capability. Unlike image generation, this does not infer a provider default today. Set an explicit `provider/model` such as `qwen/wan2.6-t2v`, and configure that provider's auth/API key too.
 - Per-agent defaults can override `agents.defaults.model` via `agents.list[].model` plus bindings (see [/concepts/multi-agent](/concepts/multi-agent)).
 
 ## Quick model policy
@@ -55,6 +56,7 @@ subscription** (OAuth) and **Anthropic** (API key or Claude CLI).
 - `agents.defaults.imageModel.primary` and `agents.defaults.imageModel.fallbacks`
 - `agents.defaults.pdfModel.primary` and `agents.defaults.pdfModel.fallbacks`
 - `agents.defaults.imageGenerationModel.primary` and `agents.defaults.imageGenerationModel.fallbacks`
+- `agents.defaults.videoGenerationModel.primary` and `agents.defaults.videoGenerationModel.fallbacks`
 - `agents.defaults.models` (allowlist + aliases + provider params)
 - `models.providers` (custom providers written into `models.json`)
 
@@ -119,7 +121,13 @@ Notes:
 - `/model status` is the detailed view (auth candidates and, when configured, provider endpoint `baseUrl` + `api` mode).
 - Model refs are parsed by splitting on the **first** `/`. Use `provider/model` when typing `/model <ref>`.
 - If the model ID itself contains `/` (OpenRouter-style), you must include the provider prefix (example: `/model openrouter/moonshotai/kimi-k2`).
-- If you omit the provider, OpenClaw treats the input as an alias or a model for the **default provider** (only works when there is no `/` in the model ID).
+- If you omit the provider, OpenClaw resolves the input in this order:
+  1. alias match
+  2. unique configured-provider match for that exact unprefixed model id
+  3. deprecated fallback to the configured default provider
+     If that provider no longer exposes the configured default model, OpenClaw
+     instead falls back to the first configured provider/model to avoid
+     surfacing a stale removed-provider default.
 
 Full command behavior/config: [Slash commands](/tools/slash-commands).
 

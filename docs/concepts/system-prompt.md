@@ -30,6 +30,22 @@ The prompt is intentionally compact and uses fixed sections:
 - **Runtime**: host, OS, node, model, repo root (when detected), thinking level (one line).
 - **Reasoning**: current visibility level + /reasoning toggle hint.
 
+The Tooling section also includes runtime guidance for long-running work:
+
+- use cron for future follow-up (`check back later`, reminders, recurring work)
+  instead of `exec` sleep loops, `yieldMs` delay tricks, or repeated `process`
+  polling
+- use `exec` / `process` only for commands that start now and continue running
+  in the background
+- when automatic completion wake is enabled, start the command once and rely on
+  the push-based wake path when it emits output or fails
+- use `process` for logs, status, input, or intervention when you need to
+  inspect a running command
+- if the task is larger, prefer `sessions_spawn`; sub-agent completion is
+  push-based and auto-announces back to the requester
+- do not poll `subagents list` / `sessions_list` in a loop just to wait for
+  completion
+
 Safety guardrails in the system prompt are advisory. They guide model behavior but do not enforce policy. Use tool policy, exec approvals, sandboxing, and channel allowlists for hard enforcement; operators can disable these by design.
 
 ## Prompt modes
@@ -135,6 +151,6 @@ This keeps the base prompt small while still enabling targeted skill usage.
 When available, the system prompt includes a **Documentation** section that points to the
 local OpenClaw docs directory (either `docs/` in the repo workspace or the bundled npm
 package docs) and also notes the public mirror, source repo, community Discord, and
-ClawHub ([https://clawhub.com](https://clawhub.com)) for skills discovery. The prompt instructs the model to consult local docs first
+ClawHub ([https://clawhub.ai](https://clawhub.ai)) for skills discovery. The prompt instructs the model to consult local docs first
 for OpenClaw behavior, commands, configuration, or architecture, and to run
 `openclaw status` itself when possible (asking the user only when it lacks access).

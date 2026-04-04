@@ -6,8 +6,8 @@ import type {
   ProviderRuntimeModel,
 } from "openclaw/plugin-sdk/plugin-entry";
 import {
-  CLAUDE_CLI_PROFILE_ID,
   applyAuthProfileConfig,
+  createProviderApiKeyAuthMethod,
   ensureApiKeyFromOptionEnvOrPrompt,
   listProfilesForProvider,
   normalizeApiKeyInput,
@@ -16,7 +16,6 @@ import {
   type ProviderAuthResult,
   validateApiKeyInput,
 } from "openclaw/plugin-sdk/provider-auth";
-import { createProviderApiKeyAuthMethod } from "openclaw/plugin-sdk/provider-auth-api-key";
 import { cloneFirstTemplateModel } from "openclaw/plugin-sdk/provider-model-shared";
 import { fetchClaudeUsage } from "openclaw/plugin-sdk/provider-usage";
 import { buildAnthropicCliBackend } from "./cli-backend.js";
@@ -27,9 +26,7 @@ import {
 } from "./config-defaults.js";
 import { anthropicMediaUnderstandingProvider } from "./media-understanding-provider.js";
 import { buildAnthropicReplayPolicy } from "./replay-policy.js";
-import {
-  wrapAnthropicProviderStream,
-} from "./stream-wrappers.js";
+import { wrapAnthropicProviderStream } from "./stream-wrappers.js";
 
 const PROVIDER_ID = "anthropic";
 const DEFAULT_ANTHROPIC_MODEL = "anthropic/claude-sonnet-4-6";
@@ -206,14 +203,24 @@ async function runAnthropicCliMigrationNonInteractive(ctx: {
   };
 }
 
-export async function registerAnthropicPlugin(api: OpenClawPluginApi): Promise<void> {
+export function registerAnthropicPlugin(api: OpenClawPluginApi): void {
+  const claudeCliProfileId = "anthropic:claude-cli";
+  const providerId = "anthropic";
+  const defaultAnthropicModel = "anthropic/claude-sonnet-4-6";
+  const anthropicOauthAllowlist = [
+    "anthropic/claude-sonnet-4-6",
+    "anthropic/claude-opus-4-6",
+    "anthropic/claude-opus-4-5",
+    "anthropic/claude-sonnet-4-5",
+    "anthropic/claude-haiku-4-5",
+  ] as const;
   api.registerCliBackend(buildAnthropicCliBackend());
   api.registerProvider({
-    id: PROVIDER_ID,
+    id: providerId,
     label: "Anthropic",
     docsPath: "/providers/models",
     envVars: ["ANTHROPIC_OAUTH_TOKEN", "ANTHROPIC_API_KEY"],
-    deprecatedProfileIds: [CLAUDE_CLI_PROFILE_ID],
+    deprecatedProfileIds: [claudeCliProfileId],
     oauthProfileIdRepairs: [
       {
         legacyProfileId: "anthropic:default",
@@ -235,7 +242,7 @@ export async function registerAnthropicPlugin(api: OpenClawPluginApi): Promise<v
           groupLabel: "Anthropic",
           groupHint: "Claude CLI + API key",
           modelAllowlist: {
-            allowedKeys: [...ANTHROPIC_OAUTH_ALLOWLIST].map((model) =>
+            allowedKeys: [...anthropicOauthAllowlist].map((model) =>
               model.replace(/^anthropic\//, "claude-cli/"),
             ),
             initialSelections: ["claude-cli/claude-sonnet-4-6"],
@@ -250,7 +257,7 @@ export async function registerAnthropicPlugin(api: OpenClawPluginApi): Promise<v
           }),
       },
       createProviderApiKeyAuthMethod({
-        providerId: PROVIDER_ID,
+        providerId,
         methodId: "api-key",
         label: "Anthropic API key",
         hint: "Direct Anthropic API key",
@@ -258,7 +265,7 @@ export async function registerAnthropicPlugin(api: OpenClawPluginApi): Promise<v
         flagName: "--anthropic-api-key",
         envVar: "ANTHROPIC_API_KEY",
         promptMessage: "Enter Anthropic API key",
-        defaultModel: DEFAULT_ANTHROPIC_MODEL,
+        defaultModel: defaultAnthropicModel,
         expectedProviders: ["anthropic"],
         wizard: {
           choiceId: "apiKey",
@@ -272,10 +279,10 @@ export async function registerAnthropicPlugin(api: OpenClawPluginApi): Promise<v
     normalizeConfig: ({ providerConfig }) => normalizeAnthropicProviderConfig(providerConfig),
     applyConfigDefaults: ({ config, env }) => applyAnthropicConfigDefaults({ config, env }),
     resolveDynamicModel: (ctx) => resolveAnthropicForwardCompatModel(ctx),
-    buildReplayPolicy: (ctx) => buildAnthropicReplayPolicy(ctx),
+    buildReplayPolicy: buildAnthropicReplayPolicy,
     isModernModelRef: ({ modelId }) => matchesAnthropicModernModel(modelId),
     resolveReasoningOutputMode: () => "native",
-    wrapStreamFn: (ctx) => wrapAnthropicProviderStream(ctx),
+    wrapStreamFn: wrapAnthropicProviderStream,
     resolveDefaultThinkingLevel: ({ modelId }) =>
       matchesAnthropicModernModel(modelId) &&
       (modelId.toLowerCase().startsWith(ANTHROPIC_OPUS_46_MODEL_ID) ||
